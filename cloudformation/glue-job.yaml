@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  InboundBucketPath:
+    Type: String
+    Description: Name of the inbound S3 bucket (e.g., my-inbound-bucket)
+    Default: "my-data-bucket-learning/inbound"
+  OutboundBucketPath:
+    Type: String
+    Description: Name of the outbound S3 bucket (e.g., my-outbound-bucket)
+    Default: "my-data-bucket-learning/outbound"
+  ScriptBucket:
+    Type: String
+    Description: S3 bucket containing the Glue job script (e.g., my-script-bucket)
+    Default: "src-code-bucket-learning/MyfirstPOC/glue-job-scripts/s3_to_parquet_job.py"
+
+Resources:
+  GlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${InboundBucketPath}/*"
+                  - !Sub "arn:aws:s3:::${InboundBucketPath}"
+                  - !Sub "arn:aws:s3:::${OutboundBucketPath}/*"
+                  - !Sub "arn:aws:s3:::${OutboundBucketPath}"
+
+  GlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: S3ToParquetJob
+      Role: !GetAtt GlueJobRole.Arn
+      Command:
+        Name: pythonshell
+        PythonVersion: "3"
+        ScriptLocation: !Sub "s3://${ScriptBucket}"
+      DefaultArguments:
+        "--job-language": "python"
+        "--inbound_path": !Sub "s3://${InboundBucketPath}/"
+        "--outbound_path": !Sub "s3://${OutboundBucketPath}/"
+      MaxCapacity: 0.0625
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      Timeout: 2880
+      MaxRetries: 0
