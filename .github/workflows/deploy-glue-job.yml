@@ -1,36 +1,48 @@
-# This is a basic workflow to help you get started with Actions
+name: Deploy Glue Infrastructure
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [main]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+env:
+  AWS_REGION: eu-north-1
+  SRC-CD-BUCKET: 'src-code-bucket-learning'  # Set in GitHub secrets
+  PROJECT_KEY_PREFIX: 'MyfirstPOC/'    # Set in GitHub secrets
+
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  deploy:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: Upload Glue Script to S3
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          # Upload with version identifier
+          TIMESTAMP=$(date +%s)
+          aws s3 cp ./scripts/glue-job.py \
+            s3://${{ secrets.SRC-CD-BUCKET }}/${{ secrets.PROJECT_KEY_PREFIX }}/glue-job-scripts/glue-job-${TIMESTAMP}.py
+
+          # Update latest version
+          aws s3 cp ./scripts/glue-job.py \
+            s3://${{ secrets.SRC-CD-BUCKET }}/${{ secrets.PROJECT_KEY_PREFIX }}/glue-job-scripts/glue-job-latest.py
+
+      - name: Deploy CloudFormation Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation.yml \
+            --stack-name glue-stack \
+            --parameter-overrides \
+              GlueScriptBucket=${{ secrets.SRC-CD-BUCKET }} \
+              GlueScriptKey=${{ secrets.PROJECT_KEY_PREFIX }}/glue-job-scripts/glue-job-latest.py \
+            --capabilities CAPABILITY_NAMED_IAM
