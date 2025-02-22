@@ -31,7 +31,7 @@ jobs:
           # Upload with version identifier
           TIMESTAMP=$(date +%s)
           aws s3 cp ./scripts/glue-job.py \
-            s3://$SRC_CD_BUCKET/$PROJECT_KEY_PREFIX/glue-job-scripts/glue-job-${TIMESTAMP}.py
+            s3://$SRC-CD-BUCKET/$PROJECT_KEY_PREFIX/glue-job-scripts/glue-job-${TIMESTAMP}.py
 
 
           # Update latest version
