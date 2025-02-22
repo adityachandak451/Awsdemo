@@ -41,7 +41,7 @@ jobs:
       - name: Deploy CloudFormation Stack
         run: |
           aws cloudformation deploy \
-            --template-file cloudformation.yml \
+            --template-file ./cloudformation/glue-job.yaml  \
             --stack-name glue-stack \
             --parameter-overrides \
               GlueScriptBucket=$SRC_CD_BUCKET \
